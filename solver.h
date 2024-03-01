@@ -7,13 +7,15 @@
 #include <unordered_map>
 #include "cell.h"
 #include <stack>
+#include <list>
 
 class Solver{
 public:
     std::vector<std::vector<Cell>> data;
     std::unordered_map<Cell*,std::set<Cell*>> nodes;
 
-    std::queue<Cell*> impacted;
+    //std::list<Cell*> checkUnknows;
+    //int number_unknows_to_check;
 
     bool UPDATED_BOARD;
     //util needed alot - dont need to alocate all the time
@@ -47,12 +49,9 @@ public:
     }
 
     void Init();
-    bool SolveTrivial();
+    bool SolveTrivial(Cell* node);
     bool CheckEnd();
     bool FinishIsland(Cell* node);
-
-    void MakeExploratoryMove(Cell* node, int row, int column);
-
 private:
 
     //PRODUCTIVE
@@ -62,9 +61,9 @@ private:
     //EVERY ITERATION
     bool BetweenIslandsCheck();
     bool OceanConnectCheck();
-    bool OnlyOneOptionCheck();
-    bool FillIslandsCheck();
-    bool TwoOptionsDiagonalCheck();
+    bool OnlyOneOptionCheck(std::unordered_map<Cell*,std::set<Cell*>>::iterator &node);
+    bool FillIslandsCheck(std::unordered_map<Cell*,std::set<Cell*>>::iterator &node);
+    bool TwoOptionsDiagonalCheck(std::unordered_map<Cell*,std::set<Cell*>>::iterator &node);
 
     //ONLY CHECK
     //ONCE AT END

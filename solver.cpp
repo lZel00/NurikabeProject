@@ -9,21 +9,45 @@
 void Solver::Init(){
     OnesCheck();
     UnreachablesCheck();
+
+    do{
+        UPDATED_BOARD = false;
+        //productive checks
+        BetweenIslandsCheck();
+        for(std::unordered_map<Cell*,std::set<Cell*>>::iterator i = nodes.begin(); i != nodes.end(); i++){
+            OnlyOneOptionCheck(i);
+            TwoOptionsDiagonalCheck(i);
+            FillIslandsCheck(i);
+        }
+
+        BetweenIslandsCheck();
+        OceanConnectCheck();
+
+    }while(UPDATED_BOARD);
 }
 
-bool Solver::SolveTrivial(){
+
+bool Solver::SolveTrivial(Cell* node){
     //MAKE THIS BETTER
+    std::unordered_map<Cell*,std::set<Cell*>>::iterator all_node = nodes.find(node);
     do{
         UPDATED_BOARD = false;
         //productive checks
         if(!BetweenIslandsCheck()) return false;
-        if(!OnlyOneOptionCheck()) return false;
+
+        do{
+            UPDATED_BOARD = false;
+            if(!OnlyOneOptionCheck(all_node)) return false;
+        }while(UPDATED_BOARD);
+
+        if(!BetweenIslandsCheck()) return false;
+
         if(!OceanConnectCheck()) return false;
-        if(!FillIslandsCheck()) return false; //something wrong with this
-        if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
+        if(!TwoOptionsDiagonalCheck(all_node)) return false; //something wrong with this
         //only checks
         //check if 4x4 is good - doesnt do anything - good to check early so you dont create unnecesary branches
         if(!Check4x4Ocean()) return false;
+        if(!FillIslandsCheck(all_node)) return false;
 
     }while(UPDATED_BOARD);
 
@@ -40,10 +64,6 @@ bool Solver::FinishIsland(Cell* node){
         }
     }
     return true;
-}
-
-void Solver::MakeExploratoryMove(Cell* node, int row, int column){
-    data[row][column].color = Island;
 }
 
 //only do once at beggining- mark around ones
@@ -193,162 +213,155 @@ bool Solver::OceanConnectCheck(){
     return true;
 }
 //for nodes
-bool Solver::OnlyOneOptionCheck(){
+bool Solver::OnlyOneOptionCheck(std::unordered_map<Cell*,std::set<Cell*>>::iterator &node){
     Cell* one_neighbour = nullptr;
 
-    for(auto& node : nodes){
-        one_neighbour = nullptr;
-        for(auto const& island: node.second){
-            neighbours = getColorNeighbours(data, island, {Unknown});
-            if(neighbours.size() > 1){
-                one_neighbour = nullptr; //this is set since breaking still goes to the if statement
+    one_neighbour = nullptr;
+    for(auto const& island: node->second){
+        neighbours = getColorNeighbours(data, island, {Unknown});
+        if(neighbours.size() > 1){
+            one_neighbour = nullptr; //this is set since breaking still goes to the if statement
+            break;
+        }
+        else if(neighbours.size() == 1){
+            if(one_neighbour == nullptr){
+                one_neighbour = neighbours[0];
+            }
+            else{
+                one_neighbour = nullptr;
                 break;
             }
-            else if(neighbours.size() == 1){
-                if(one_neighbour == nullptr){
-                    one_neighbour = neighbours[0];
-                }
-                else{
-                    one_neighbour = nullptr;
-                    break;
-                }
-            }
         }
-        if(one_neighbour){
-            UPDATED_BOARD = true;
-            if(!one_neighbour->changeColor(Island))
-                return false;
-            one_neighbour->owner_node = node.first;
-            node.first->num_islands++;
-            node.second.insert(one_neighbour);
+    }
+    if(one_neighbour){
+        UPDATED_BOARD = true;
+        if(!one_neighbour->changeColor(Island))
+            return false;
+        one_neighbour->owner_node = node->first;
+        node->first->num_islands++;
+        node->second.insert(one_neighbour);
 
-            if(node.first->max_num_islands == node.first->num_islands)
-                finishIsland(data, node.first);
-        }
+        if(node->first->max_num_islands == node->first->num_islands)
+            finishIsland(data, node->first);
     }
     return true;
 }
 
 //input nodes
-bool Solver::FillIslandsCheck(){
+bool Solver::FillIslandsCheck(std::unordered_map<Cell*,std::set<Cell*>>::iterator &node){
     //this checks if i know that one direction doesnt have space, need to go to that direction
     std::vector<Cell*> all_unknown_neighbours;
     std::vector<FillIsland> possible_stacks;//first is maximal depth, second is stack
     int num_unknown_neighbours = 0;
 
-    for(auto& n: nodes){
-        all_unknown_neighbours.clear();
-        const int required_cells = n.first->max_num_islands - n.first->num_islands;
+    all_unknown_neighbours.clear();
+    const int required_cells = node->first->max_num_islands - node->first->num_islands;
 
-        for(auto const& island: n.second){
-            neighbours = getColorNeighbours(data, island, {Unknown});
-            for(auto& n: neighbours){
-                all_unknown_neighbours.emplace_back(n);
-            }
+    for(auto const& island: node->second){
+        neighbours = getColorNeighbours(data, island, {Unknown});
+        for(auto& n: neighbours){
+            all_unknown_neighbours.emplace_back(n);
         }
+    }
 
-        possible_stacks.clear();
-        num_unknown_neighbours = 0;
-        if(all_unknown_neighbours.size() > 1){
-            for(auto const& n1: all_unknown_neighbours){
+    possible_stacks.clear();
+    if(all_unknown_neighbours.size() > 1){
+        for(auto const& n1: all_unknown_neighbours){
 
-                possible_stacks.emplace_back(FillIsland());
-                possible_stacks.back().s.push(n1);
-                possible_stacks.back().visited.emplace(n1);
-                while(!possible_stacks.back().s.empty() &&
-                       possible_stacks.back().max_depth < required_cells) {
+            possible_stacks.emplace_back(FillIsland());
+            possible_stacks.back().s.push(n1);
+            possible_stacks.back().visited.emplace(n1);
+            while(!possible_stacks.back().s.empty() &&
+                   possible_stacks.back().max_depth < required_cells) {
 
-                    std::vector<Cell*> unknown_neighbours = getColorNeighbours(data, possible_stacks.back().s.top(), {Unknown});
+                std::vector<Cell*> unknown_neighbours = getColorNeighbours(data, possible_stacks.back().s.top(), {Unknown});
 
-                    num_unknown_neighbours = 0;
-                    for(auto const& n2: unknown_neighbours){
-                        if(possible_stacks.back().visited.find(n2) == possible_stacks.back().visited.end()){
-                            possible_stacks.back().max_depth++;
-                            possible_stacks.back().s.push(n2);
-                            possible_stacks.back().visited.emplace(n2);
-                            num_unknown_neighbours++;
-                        }
+                num_unknown_neighbours = 0;
+                for(auto const& n2: unknown_neighbours){
+                    if(possible_stacks.back().visited.find(n2) == possible_stacks.back().visited.end()){
+                        possible_stacks.back().max_depth++;
+                        possible_stacks.back().s.push(n2);
+                        possible_stacks.back().visited.emplace(n2);
+                        num_unknown_neighbours++;
                     }
-                    //i pop in case there are no new neighbours because we are working with stack - we want to return to this node. But if there is nothing left we dont have to
-                    if(num_unknown_neighbours == 0)
-                        possible_stacks.back().s.pop();
                 }
+                //i pop in case there are no new neighbours because we are working with stack - we want to return to this node. But if there is nothing left we dont have to
+                if(num_unknown_neighbours == 0)
+                    possible_stacks.back().s.pop();
+            }
 
+        }
+        //now we check the potential depth
+        int sum_of_less_than = 0;
+        Cell* inf = nullptr;
+        for(uint16_t i = 0; i < possible_stacks.size(); i++){
+            if(possible_stacks[i].max_depth < required_cells)
+                sum_of_less_than += possible_stacks[i].max_depth;
+            else if(inf){
+                sum_of_less_than = required_cells+100;
+                break;
             }
-            //now we check the potential depth
-            int sum_of_less_than = 0;
-            Cell* inf = nullptr;
-            for(uint16_t i = 0; i < possible_stacks.size(); i++){
-                if(possible_stacks[i].max_depth < required_cells)
-                    sum_of_less_than += possible_stacks[i].max_depth;
-                else if(inf){
-                    sum_of_less_than = required_cells+100;
-                    break;
-                }
-                else
-                    inf = all_unknown_neighbours[i];
+            else
+                inf = all_unknown_neighbours[i];
+        }
+        if(sum_of_less_than <= required_cells){
+            UPDATED_BOARD = true;
+            if(inf){
+                if(!inf->changeColor(Island))
+                    return false;
+                inf->owner_node = node->first;
+                node->first->num_islands++;
+                node->second.insert(inf);
             }
-            if(sum_of_less_than <= required_cells){
-                UPDATED_BOARD = true;
-                if(inf){
-                    if(!inf->changeColor(Island))
+            else{
+                for(auto n1: all_unknown_neighbours){
+                    if(!n1->changeColor(Island))
                         return false;
-                    inf->owner_node = n.first;
-                    n.first->num_islands++;
-                    n.second.insert(inf);
+                    n1->owner_node = node->first;
+                    node->first->num_islands++;
+                    node->second.insert(n1);
                 }
-                else{
-                    for(auto n1: all_unknown_neighbours){
-                        if(!n1->changeColor(Island))
-                            return false;
-                        n1->owner_node = n.first;
-                        n.first->num_islands++;
-                        n.second.insert(n1);
-                    }
-                }
-                if(n.first->max_num_islands == n.first->num_islands)
-                    finishIsland(data, n.first);
             }
+            if(node->first->max_num_islands == node->first->num_islands)
+                finishIsland(data, node->first);
         }
     }
     return true;
 }
 //for every node
-bool Solver::TwoOptionsDiagonalCheck(){
+bool Solver::TwoOptionsDiagonalCheck(std::unordered_map<Cell*,std::set<Cell*>>::iterator &node){
     //if 1 more nneded option and a only 2 options are diagonal, we know the diagonal is good
 
-    for(auto const& node: nodes){
-        if(node.first->max_num_islands - node.first->num_islands == 1){
+    if(node->first->max_num_islands - node->first->num_islands == 1){
 
-            for(auto const& island: node.second){
-                neighbours = getColorNeighbours(data, island, {Unknown});
-                //problem - even if you have access to unknown cell it doent mean its an exit tile
-                if(neighbours.size() == 2){
-                    //the order of neighbours is always from 12 o clock in clockwise
-                    if(neighbours[0]->row+1== island->row && neighbours[1]->column-1 == island->column &&
-                        data[island->row-1][island->column+1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row-1][island->column+1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[0]->column-1 == island->column && neighbours[1]->row-1 == island->row &&
-                             data[island->row+1][island->column+1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row+1][island->column+1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[0]->row-1 == island->row && neighbours[1]->column+1 == island->column &&
-                             data[island->row+1][island->column-1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row+1][island->column-1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[1]->column+1 == island->column && neighbours[0]->row+1 == island->row &&
-                             data[island->row-1][island->column-1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row-1][island->column-1].changeColor(Ocean))
-                            return false;
-                    }
+        for(auto const& island: node->second){
+            neighbours = getColorNeighbours(data, island, {Unknown});
+            //problem - even if you have access to unknown cell it doent mean its an exit tile
+            if(neighbours.size() == 2){
+                //the order of neighbours is always from 12 o clock in clockwise
+                if(neighbours[0]->row+1== island->row && neighbours[1]->column-1 == island->column &&
+                    data[island->row-1][island->column+1].color != Ocean){
+                    UPDATED_BOARD = true;
+                    if(!data[island->row-1][island->column+1].changeColor(Ocean))
+                        return false;
+                }
+                else if(neighbours[0]->column-1 == island->column && neighbours[1]->row-1 == island->row &&
+                         data[island->row+1][island->column+1].color != Ocean){
+                    UPDATED_BOARD = true;
+                    if(!data[island->row+1][island->column+1].changeColor(Ocean))
+                        return false;
+                }
+                else if(neighbours[0]->row-1 == island->row && neighbours[1]->column+1 == island->column &&
+                         data[island->row+1][island->column-1].color != Ocean){
+                    UPDATED_BOARD = true;
+                    if(!data[island->row+1][island->column-1].changeColor(Ocean))
+                        return false;
+                }
+                else if(neighbours[1]->column+1 == island->column && neighbours[0]->row+1 == island->row &&
+                         data[island->row-1][island->column-1].color != Ocean){
+                    UPDATED_BOARD = true;
+                    if(!data[island->row-1][island->column-1].changeColor(Ocean))
+                        return false;
                 }
             }
         }

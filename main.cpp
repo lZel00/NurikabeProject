@@ -18,32 +18,36 @@ Solver queue_solver(std::vector<std::vector<Cell>> &data, std::vector<Cell*> &no
     q.push(Solver(data, nodes));
     q.front().Init();
     while(!q.front().CheckEnd()){
-        if(q.front().SolveTrivial()){
 
-            for(auto const& node: q.front().nodes){
-                if(node.first->num_islands < node.first->max_num_islands){
-                    for(auto const& island: node.second){
-                        q.front().neighbours = getColorNeighbours(q.front().data, island, {Unknown});
-                        for(auto const& n: q.front().neighbours){
-                            q.push(Solver(q.front()));
-                            new_island = &q.back().data[n->row][n->column];
-                            new_node = &q.back().data[node.first->row][node.first->column];
+        for(auto const& node: q.front().nodes){
+            if(node.first->num_islands < node.first->max_num_islands){
+                for(auto const& island: node.second){
+                    q.front().neighbours = getColorNeighbours(q.front().data, island, {Unknown});
+                    for(auto const& n: q.front().neighbours){
+                        Solver temp(q.front());
+                        //q.push(Solver(q.front()));
+                        new_island = &temp.data[n->row][n->column];
+                        new_node = &temp.data[node.first->row][node.first->column];
 
-                            new_island->changeColor(Island);
-                            new_island->owner_node = new_node;
-                            q.back().nodes.find(new_node)->second.insert(new_island);
-                            new_node->num_islands++;
+                        new_island->changeColor(Island);
+                        new_island->owner_node = new_node;
+                        temp.nodes.find(new_node)->second.insert(new_island);
+                        new_node->num_islands++;
 
-                            if(new_node->max_num_islands == new_node->num_islands){
-                                q.back().FinishIsland(new_node);
-                            }
-
+                        if(new_node->max_num_islands == new_node->num_islands){
+                            temp.FinishIsland(new_node);
                         }
+                        if(temp.SolveTrivial(new_node)){
+                            q.push(temp);
+                        }
+
+
                     }
                 }
             }
-            //means that this accuary isnt' dead yet
         }
+        //means that this accuary isnt' dead yet
+
         q.pop();
 
     }
@@ -59,34 +63,34 @@ bool stack_recursion(Solver &a){
         return true;
     }
 
-    if(a.SolveTrivial()){
-        for(auto const& node: a.nodes){
-            if(node.first->num_islands < node.first->max_num_islands){
+    for(auto const& node: a.nodes){
+        if(node.first->num_islands < node.first->max_num_islands){
 
-                for(auto const& island: node.second){
-                    a.neighbours = getColorNeighbours(a.data, island, {Unknown});
-                    for(auto const& n: a.neighbours){
-                        Solver temp(a);
+            for(auto const& island: node.second){
+                a.neighbours = getColorNeighbours(a.data, island, {Unknown});
+                for(auto const& n: a.neighbours){
+                    Solver temp(a);
 
-                        new_island = &temp.data[n->row][n->column];
-                        new_node = &temp.data[node.first->row][node.first->column];
+                    new_island = &temp.data[n->row][n->column];
+                    new_node = &temp.data[node.first->row][node.first->column];
 
-                        new_island->changeColor(Island);
-                        new_island->owner_node = new_node;
-                        new_node->num_islands++;
-                        temp.nodes.find(new_node)->second.insert(new_island);
+                    new_island->changeColor(Island);
+                    new_island->owner_node = new_node;
+                    new_node->num_islands++;
+                    temp.nodes.find(new_node)->second.insert(new_island);
 
-                        if(new_node->max_num_islands == new_node->num_islands){
-                            temp.FinishIsland(new_node);
-                        }
-
-                        if(stack_recursion(temp))
-                            return true;
+                    if(new_node->max_num_islands == new_node->num_islands){
+                        temp.FinishIsland(new_node);
                     }
 
+                    if(temp.SolveTrivial(new_node) && stack_recursion(temp)){
+                        return true;
+                    }
                 }
+
             }
         }
+
     }
     return false;
 }
@@ -121,7 +125,7 @@ int main(){
     //start_solver.Init();
     //start_solver.SolveTrivial();
     //VCASIH ONLYONEOPTIONCHECK NE DELA
-    Solver solution = stack_solver(data, nodes);
+    Solver solution = queue_solver(data, nodes);
 
 /*
     OnesCheck(data,nodes);
