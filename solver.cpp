@@ -129,28 +129,26 @@ bool Solver::BetweenIslandsCheck(){
 bool Solver::OceanConnectCheck(){
     //quite hard - check if whole Ocean formation (set, queue) has any more than 1 Free neighbour
     //TODO make it so you don't have to recheck it for whole formation
-    std::set<Cell*> ocean_formation;
     std::vector<Cell*> starting_ocean_neighbours;
+    std::vector<Cell*> all_unknown_neighbours;
     //we get all ocean neighbours
 
     for(auto& row : data){
         for(auto& cell: row){
             if(cell.color == Unknown){
-                ocean_formation.clear();
                 starting_ocean_neighbours = getColorNeighbours(data, &cell, {Ocean});
 
                 if(starting_ocean_neighbours.size() == 4){
                     UPDATED_BOARD = true;
                     if(!cell.changeColor(Ocean))
                         return false;
-                    return true;
+                    continue;
                 }
 
                 for(auto &ocean: starting_ocean_neighbours){
                     std::queue<Cell*> q;
                     std::set<Cell*> this_ocean_formation;
-
-                    bool isOcean = true;
+                    all_unknown_neighbours.clear();
 
                     q.push(ocean);
                     this_ocean_formation.emplace(q.front());
@@ -158,30 +156,64 @@ bool Solver::OceanConnectCheck(){
                         //if we find any other Unknown neighbours - break
                         neighbours = getColorNeighbours(data, q.front(), {Unknown});
                         //problem - even if you have access to unknown cell it doent mean its an exit tile
-                        if(!neighbours.empty() && !(neighbours.size() == 1 && neighbours[0] == &cell)){
-                            isOcean = false;
-                            break;
+                        for(auto const& n: neighbours){
+                            if(n != &cell)
+                                all_unknown_neighbours.emplace_back(n);
                         }
 
                         neighbours = getColorNeighbours(data, q.front(), {Ocean});
                         for(auto n: neighbours){
-                            if(ocean_formation.find(n) != ocean_formation.end()){
-                                return true;
-                            }
-                            if(this_ocean_formation.find(n) == this_ocean_formation.end()){
-                                this_ocean_formation.emplace(n);
+                            if(this_ocean_formation.emplace(n).second){
                                 q.push(n);
                             }
                         }
                         q.pop();
                     }
-                    for(auto o : this_ocean_formation){
-                        ocean_formation.emplace(o);
-                    }
-                    if(isOcean){
+                    if(all_unknown_neighbours.size() == 0){
                         UPDATED_BOARD = true;
                         if(!cell.changeColor(Ocean))
                             return false;
+                    }
+                    //checks if it touches any different ocean formation than this_ocean_formation
+
+                    else{
+                        bool end_search = false;
+                        std::set<Cell*> this_unknows_form;
+                        for(auto const& un: all_unknown_neighbours){
+
+                            std::queue<Cell*> q;
+                            q.push(un);
+                            this_unknows_form.emplace(un);
+                            while(!q.empty()){
+                                //if we find any other Unknown neighbours - break
+                                neighbours = getColorNeighbours(data, q.front(), {Ocean});
+                                //problem - even if you have access to unknown cell it doent mean its an exit tile
+                                for(auto const& n: neighbours){
+                                    if(this_ocean_formation.find(n) == this_ocean_formation.end()){
+                                        end_search = true;
+                                        break;
+                                    }
+                                }
+                                if(end_search)
+                                    break;
+
+                                neighbours = getColorNeighbours(data, q.front(), {Unknown});
+                                for(auto n: neighbours){
+                                    //if insertion took place
+                                    if(this_unknows_form.emplace(n).second){
+                                        q.push(n);
+                                    }
+                                }
+                                q.pop();
+                            }
+                            if(end_search)
+                                break;
+                        }
+                        if(!end_search){
+                            UPDATED_BOARD = true;
+                            if(!cell.changeColor(Ocean))
+                                return false;
+                        }
                     }
                 }
             }
@@ -426,6 +458,37 @@ bool Solver::CheckOceanConnect(){
     return connected_oceans.size() == all_oceans.size();
 }
 
+bool Solver::Check4x4OceanNew(){
+    //TODO FIND ITS OWNER!!!
+    for(uint16_t row = 0; row < data.size(); row++){
+        for(uint16_t column = 0; column < data[row].size(); column++){
+
+            if(data[row][column].color == Unknown &&
+                ((row > 0 && column > 0 && data[row-1][column].color == Ocean &&
+                  data[row][column-1].color == Ocean && data[row-1][column-1].color == Ocean)
+                 ||
+                 (row > 0 && column < static_cast<int>(data[row].size()-1) && data[row-1][column].color == Ocean &&
+                  data[row][column+1].color == Ocean && data[row-1][column+1].color == Ocean)
+                 ||
+                 (row < static_cast<int>(data.size()-1) && column > 0 && data[row+1][column].color == Ocean &&
+                  data[row][column-1].color == Ocean && data[row+1][column-1].color == Ocean)
+                 ||
+                 (row < static_cast<int>(data.size()-1) && column < static_cast<int>(data[row].size()-1)
+                  && data[row+1][column].color == Ocean && data[row][column+1].color == Ocean && data[row+1][column+1].color == Ocean))){
+
+                UPDATED_BOARD = true;
+                if(!data[row][column].changeColor(Island))
+                    return false;
+            }
+        }
+    }
+    return true;
+}
+
+void Solver::findOwner(){
+
+}
+
 bool Solver::Check4x4Ocean(){
     //TODO FIND ITS OWNER!!!
     for(uint16_t row = 0; row < data.size(); row++){
@@ -444,7 +507,7 @@ bool Solver::Check4x4Ocean(){
                 (row < static_cast<int>(data.size()-1) && column < static_cast<int>(data[row].size()-1)
                   && data[row+1][column].color == Ocean && data[row][column+1].color == Ocean && data[row+1][column+1].color == Ocean))){
 
-                //UPDATED_BOARD = true;
+                UPDATED_BOARD = true;
                 //return cell->changeColor(Island);
                 return false;
             }

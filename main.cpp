@@ -119,7 +119,9 @@ int main(){
 
     Solver start_solver(data, nodes);
     start_solver.Init();
-    start_solver.SolveTrivial();
+    if(!start_solver.SolveTrivial()){
+        std::cout << "MISTAKE FOUND!!" << std::endl;
+    }
     //VCASIH ONLYONEOPTIONCHECK NE DELA
     //Solver solution = stack_solver(data, nodes);
 

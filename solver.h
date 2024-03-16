@@ -64,6 +64,10 @@ private:
     bool FillIslandsCheck();
     bool TwoOptionsDiagonalCheck();
     bool OneReachCheck();
+    bool Check4x4OceanNew();
+
+
+    void findOwner();
 
     //ONLY CHECK
     //ONCE AT END
