@@ -13,7 +13,7 @@ public:
     std::vector<std::vector<Cell>> data;
     std::unordered_map<Cell*,std::set<Cell*>> nodes;
 
-    std::queue<Cell*> impacted;
+    //std::queue<Cell*> impacted;
 
     bool UPDATED_BOARD;
     //util needed alot - dont need to alocate all the time
@@ -51,8 +51,6 @@ public:
     bool CheckEnd();
     bool FinishIsland(Cell* node);
 
-    void MakeExploratoryMove(Cell* node, int row, int column);
-
 private:
 
     //PRODUCTIVE
@@ -65,6 +63,7 @@ private:
     bool OnlyOneOptionCheck();
     bool FillIslandsCheck();
     bool TwoOptionsDiagonalCheck();
+    bool OneReachCheck();
 
     //ONLY CHECK
     //ONCE AT END

@@ -20,7 +20,8 @@ bool Solver::SolveTrivial(){
         if(!OnlyOneOptionCheck()) return false;
         if(!OceanConnectCheck()) return false;
         if(!FillIslandsCheck()) return false; //something wrong with this
-        if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
+        //if(!OneReachCheck()) return false; //something wrong with this
+
         //only checks
         //check if 4x4 is good - doesnt do anything - good to check early so you dont create unnecesary branches
         if(!Check4x4Ocean()) return false;
@@ -40,10 +41,6 @@ bool Solver::FinishIsland(Cell* node){
         }
     }
     return true;
-}
-
-void Solver::MakeExploratoryMove(Cell* node, int row, int column){
-    data[row][column].color = Island;
 }
 
 //only do once at beggining- mark around ones
@@ -349,6 +346,47 @@ bool Solver::TwoOptionsDiagonalCheck(){
                         if(!data[island->row-1][island->column-1].changeColor(Ocean))
                             return false;
                     }
+                }
+            }
+        }
+    }
+    return true;
+}
+//NOT WORKING!
+bool Solver::OneReachCheck(){
+    int cur_dist = 0, needed_dist = 0;
+    std::vector<Cell*> possibilities;
+    for(uint16_t row = 0; row < data.size(); row++){
+        for(uint16_t column = 0; column < data[row].size(); column++){
+            if(data[row][column].color == Unknown){
+                possibilities.clear();
+                for(auto const& node: nodes){
+                    needed_dist = node.first->max_num_islands - node.first->num_islands;
+                    if(needed_dist == 0)
+                        continue;
+
+                    for(auto const& island: node.second){
+                        cur_dist = getDistance(island, &data[row][column]);
+                        if(cur_dist < needed_dist){
+                            possibilities.emplace_back(node.first);
+                            break;
+                        }
+                    }
+                    if(possibilities.size() > 1){
+                        break;
+                    }
+                }
+                //if after everynode there are no possibilites - wrong!!!
+                if(possibilities.empty())
+                    return false;
+                else if(possibilities.size() == 1){
+                    if(!data[row][column].changeColor(Island))
+                        return false;
+                    data[row][column].owner_node = possibilities.front();
+                    possibilities.front()->num_islands++;
+                    nodes.find(possibilities.front())->second.insert(&data[row][column]);
+                    if(possibilities.front()->max_num_islands == possibilities.front()->num_islands)
+                        finishIsland(data, possibilities.front());
                 }
             }
         }

@@ -117,11 +117,12 @@ int main(){
 
     print(data);
 
-    //Solver start_solver(data, nodes);
-    //start_solver.Init();
-    //start_solver.SolveTrivial();
+    Solver start_solver(data, nodes);
+    start_solver.Init();
+    start_solver.SolveTrivial();
     //VCASIH ONLYONEOPTIONCHECK NE DELA
-    Solver solution = stack_solver(data, nodes);
+    //Solver solution = stack_solver(data, nodes);
+
 
 /*
     OnesCheck(data,nodes);
@@ -139,7 +140,8 @@ int main(){
     //if an error happens it returns from recursion - be carefull not refrenece data with reference!!!!!
 
 
-    checkSolution(solution.data, solution_filename);
+    checkSolution(start_solver.data, solution_filename);
+    //checkSolution(solution.data, solution_filename);
     auto stop =  std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "That took " << duration.count() << "ms" << std::endl;
