@@ -11,18 +11,28 @@ void Solver::Init(){
 }
 
 bool Solver::SolveTrivial(){
+    std::string example = "2";
+
+    const std::string solution_filename = "D:/Faks/5/OptimizacijskeMetode/Nurikabe/nurikabe-resitev" + example + ".txt";
     //MAKE THIS BETTER
     do{
         UPDATED_BOARD = false;
         //productive checks
         if(!BetweenIslandsCheck()) return false;
+
         if(!OnlyOneOptionCheck()) return false;
         if(!OceanConnectCheck()) return false;
         if(!FillIslandsCheck()) return false; //something wrong with this
+
         if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
+
         //if(!OneReachCheck()) return false; //something wrong with this
-        UnreachablesCheck();
+        if(!UnreachablesCheck()) return false;
+        std::cout << "BEFORE" << std::endl;
+        checkSolution(data, solution_filename);
         if(!Check4x4Ocean()) return false;
+        std::cout << "AFTER" << std::endl;
+        checkSolution(data, solution_filename);
 
     }while(UPDATED_BOARD);
 
@@ -58,6 +68,7 @@ bool Solver::OnesCheck(){
 
 bool Solver::UnreachablesCheck(){
     //marks nodes as ocean if they are unreahable by any island
+    //TODO - FIX
     std::queue<Cell*> q;
     std::vector<std::vector<bool>> reachable(data.size(),std::vector<bool>(data[0].size()));
 
@@ -71,16 +82,18 @@ bool Solver::UnreachablesCheck(){
                 reachableIt[q.front()->row][q.front()->column] = 0;
                 reachable[q.front()->row][q.front()->column] = true;
                 while(!q.empty()){
-                    if( reachableIt[q.front()->row][q.front()->column] >=node.first->max_num_islands - node.first->num_islands){
+                    if( reachableIt[q.front()->row][q.front()->column] >= node.first->max_num_islands - node.first->num_islands){
                         q.pop();
                         continue;
                     }
 
                     neighbours = getColorNeighbours(data, q.front(), {Unknown,Node, Island});
                     for(auto n : neighbours){
-                        q.push(n);
-                        reachableIt[n->row][n->column] = reachableIt[q.front()->row][q.front()->column]+1;
-                        reachable[n->row][n->column] = true;
+                        if(reachableIt[n->row][n->column] > reachableIt[q.front()->row][q.front()->column]+1){
+                            q.push(n);
+                            reachableIt[n->row][n->column] = reachableIt[q.front()->row][q.front()->column]+1;
+                            reachable[n->row][n->column] = true;
+                        }
                     }
                     q.pop();
                 }
@@ -90,8 +103,12 @@ bool Solver::UnreachablesCheck(){
     for(uint16_t i = 0; i < data.size(); i++){
         for(uint16_t j = 0; j < data[i].size(); j++){
             if(reachable[i][j] == false && data[i][j].color == Unknown){
+                if(i == 1 && j == 9){
+                    std::cout << "a" << std::endl;
+                }
                 UPDATED_BOARD = true;
-                data[i][j].changeColor(Ocean);
+                if(!data[i][j].changeColor(Ocean))
+                    return false;
             }
         }
     }
@@ -275,11 +292,9 @@ bool Solver::OnlyOneOptionCheck(){
 
 //input nodes
 bool Solver::FillIslandsCheck(){
-    //MAKE IT SO CHECKS IF ISLAND THAT I WOULD PLACE WOULD BE VALID!!!!
     //this checks if i know that one direction doesnt have space, need to go to that direction
     std::vector<Cell*> all_unknown_neighbours;
     std::vector<FillIsland> possible_stacks;//first is maximal depth, second is stack
-    print(data);
     int num_unknown_neighbours = 0;
 
     for(auto& n: nodes){
@@ -357,7 +372,6 @@ bool Solver::FillIslandsCheck(){
                 if(n.first->max_num_islands == n.first->num_islands)
                     finishIsland(data, n.first);
             }
-            /*
             else if(static_cast<int>(unique_possibilities.size()) <= required_cells){
                 for(auto const& n1: unique_possibilities){
                     if(!n1->changeColor(Island))
@@ -367,7 +381,6 @@ bool Solver::FillIslandsCheck(){
                     n.second.insert(n1);
                 }
             }
-            */
         }
     }
     return true;
@@ -489,7 +502,7 @@ bool Solver::CheckOceanConnect(){
 }
 
 bool Solver::Check4x4Ocean(){
-    //TODO FIND ITS OWNER!!!
+    //HERE MISTAKE
     for(uint16_t row = 0; row < data.size(); row++){
         for(uint16_t column = 0; column < data[row].size(); column++){
 
@@ -531,24 +544,31 @@ struct fOwnerStruct{
 
 bool Solver::findOwner(Cell* cell){
     std::vector<std::pair<Cell*, std::vector<Cell*>>> paths;
+
     for(auto const& node: nodes){
         if(node.first->max_num_islands > node.first->num_islands && getDistance(node.first, cell) < node.first->max_num_islands){
             //path can exist!!
             uint16_t max_changes = node.first->max_num_islands - node.first->num_islands;
             std::deque<fOwnerStruct> q;
             std::set<Cell*> been_here;
+            std::set<Cell*> mark_for_destruction;
 
             q.push_back(fOwnerStruct(node.first));
             been_here.emplace(node.first);
             while(!q.empty()){
                 //if we are too far
-                if(q.front().prev.size() > max_changes){
+                if(q.front().prev.size() > max_changes || mark_for_destruction.find(q.front().c) != mark_for_destruction.end()){
                     q.pop_front();
                     continue;
                 }
                 neighbours = getColorNeighbours(data, q.front().c, {Unknown, Island});
 
                 for(auto const& n: neighbours){
+                    //this for is to check if there are multible paths of equal lenght to this cell. If they are this cell is no good
+                    for(auto const& el: q){
+                        if(el.c == n)
+                            mark_for_destruction.emplace(n);
+                    }
                     //if we find cell
                     if(n == cell){
                         paths.emplace_back(std::make_pair(node.first, q.front().prev));
