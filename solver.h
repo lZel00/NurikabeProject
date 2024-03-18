@@ -64,7 +64,6 @@ private:
     bool FillIslandsCheck();
     bool TwoOptionsDiagonalCheck();
     bool OneReachCheck();
-    bool Check4x4OceanNew();
 
 
     bool findOwner(Cell* cell);

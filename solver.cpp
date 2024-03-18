@@ -8,7 +8,6 @@
 
 void Solver::Init(){
     OnesCheck();
-    UnreachablesCheck();
 }
 
 bool Solver::SolveTrivial(){
@@ -22,6 +21,7 @@ bool Solver::SolveTrivial(){
         if(!FillIslandsCheck()) return false; //something wrong with this
         if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
         //if(!OneReachCheck()) return false; //something wrong with this
+        UnreachablesCheck();
         if(!Check4x4Ocean()) return false;
 
     }while(UPDATED_BOARD);
@@ -62,31 +62,36 @@ bool Solver::UnreachablesCheck(){
     std::vector<std::vector<bool>> reachable(data.size(),std::vector<bool>(data[0].size()));
 
     for(auto const& node : nodes){
-        q.push(node.first);
-        std::vector<std::vector<bool>> reachableIt(data.size(),std::vector<bool>(data[0].size()));
-        while(!q.empty()){
-            if( reachableIt[q.front()->row][q.front()->column] ||
-                getDistance(node.first, q.front()) > node.first->max_num_islands - node.first->num_islands){
+        if(node.first->num_islands < node.first->max_num_islands){
+            for(auto const& island: node.second){
+                //i need to do every iteration seperatebly, because one small island can "hide" cells from bigger island that could reach it
+                std::vector<std::vector<int>> reachableIt(data.size(),std::vector<int>(data[0].size(),999));
 
-                q.pop();
-                continue;
+                q.push(island);
+                reachableIt[q.front()->row][q.front()->column] = 0;
+                reachable[q.front()->row][q.front()->column] = true;
+                while(!q.empty()){
+                    if( reachableIt[q.front()->row][q.front()->column] >=node.first->max_num_islands - node.first->num_islands){
+                        q.pop();
+                        continue;
+                    }
+
+                    neighbours = getColorNeighbours(data, q.front(), {Unknown,Node, Island});
+                    for(auto n : neighbours){
+                        q.push(n);
+                        reachableIt[n->row][n->column] = reachableIt[q.front()->row][q.front()->column]+1;
+                        reachable[n->row][n->column] = true;
+                    }
+                    q.pop();
+                }
             }
-
-            neighbours = getColorNeighbours(data, q.front(), {Unknown,Node});
-            for(auto n : neighbours)
-                q.push(n);
-
-            reachableIt[q.front()->row][q.front()->column] = true;
-            reachable[q.front()->row][q.front()->column] = true;
-            q.pop();
         }
     }
     for(uint16_t i = 0; i < data.size(); i++){
         for(uint16_t j = 0; j < data[i].size(); j++){
-            if(reachable[i][j] == false){
+            if(reachable[i][j] == false && data[i][j].color == Unknown){
                 UPDATED_BOARD = true;
-                if(!data[i][j].changeColor(Ocean))
-                    return false;
+                data[i][j].changeColor(Ocean);
             }
         }
     }
@@ -270,6 +275,7 @@ bool Solver::OnlyOneOptionCheck(){
 
 //input nodes
 bool Solver::FillIslandsCheck(){
+    //MAKE IT SO CHECKS IF ISLAND THAT I WOULD PLACE WOULD BE VALID!!!!
     //this checks if i know that one direction doesnt have space, need to go to that direction
     std::vector<Cell*> all_unknown_neighbours;
     std::vector<FillIsland> possible_stacks;//first is maximal depth, second is stack
@@ -486,6 +492,8 @@ bool Solver::Check4x4Ocean(){
                  (row < static_cast<int>(data.size()-1) && column < static_cast<int>(data[row].size()-1)
                   && data[row+1][column].color == Ocean && data[row][column+1].color == Ocean && data[row+1][column+1].color == Ocean))){
 
+                if(data[row][column].color == Ocean)
+                    return false;
                 if(!findOwner(&data[row][column])){
                     return false;
                 }
@@ -579,33 +587,6 @@ bool Solver::findOwner(Cell* cell){
         }
     }
 
-    return true;
-}
-
-bool Solver::Check4x4OceanNew(){
-    //TODO FIND ITS OWNER!!!
-    for(uint16_t row = 0; row < data.size(); row++){
-        for(uint16_t column = 0; column < data[row].size(); column++){
-
-            if(data[row][column].color == Ocean &&
-                ((row > 0 && column > 0 && data[row-1][column].color == Ocean &&
-                 data[row][column-1].color == Ocean && data[row-1][column-1].color == Ocean)
-                ||
-                (row > 0 && column < static_cast<int>(data[row].size()-1) && data[row-1][column].color == Ocean &&
-                 data[row][column+1].color == Ocean && data[row-1][column+1].color == Ocean)
-                ||
-                (row < static_cast<int>(data.size()-1) && column > 0 && data[row+1][column].color == Ocean &&
-                 data[row][column-1].color == Ocean && data[row+1][column-1].color == Ocean)
-                ||
-                (row < static_cast<int>(data.size()-1) && column < static_cast<int>(data[row].size()-1)
-                  && data[row+1][column].color == Ocean && data[row][column+1].color == Ocean && data[row+1][column+1].color == Ocean))){
-
-                UPDATED_BOARD = true;
-                //return cell->changeColor(Island);
-                return false;
-            }
-        }
-    }
     return true;
 }
 
