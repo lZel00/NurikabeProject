@@ -102,7 +102,7 @@ Solver stack_solver(std::vector<std::vector<Cell>> &data, std::vector<Cell*> &no
     return out;
 }
 int main(){
-    std::string example = "0";
+    std::string example = "11";
     srand (time(NULL));
 
     const std::string in_filename = "D:/Faks/5/OptimizacijskeMetode/Nurikabe/nurikabe-primer" + example + ".txt";
@@ -140,7 +140,9 @@ int main(){
 */
     //now the idea is to create recursive random funtion that randomly changes a possible value. THen solve until change
     //if an error happens it returns from recursion - be carefull not refrenece data with reference!!!!!
-
+    if(start_solver.CheckEnd()){
+        std::cout<< "END" << std::endl;
+    }
 
     checkSolution(start_solver.data, solution_filename);
     //checkSolution(solution.data, solution_filename);

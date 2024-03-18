@@ -67,7 +67,7 @@ private:
     bool Check4x4OceanNew();
 
 
-    void findOwner();
+    bool findOwner(Cell* cell);
 
     //ONLY CHECK
     //ONCE AT END

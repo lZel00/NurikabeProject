@@ -20,10 +20,8 @@ bool Solver::SolveTrivial(){
         if(!OnlyOneOptionCheck()) return false;
         if(!OceanConnectCheck()) return false;
         if(!FillIslandsCheck()) return false; //something wrong with this
+        if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
         //if(!OneReachCheck()) return false; //something wrong with this
-
-        //only checks
-        //check if 4x4 is good - doesnt do anything - good to check early so you dont create unnecesary branches
         if(!Check4x4Ocean()) return false;
 
     }while(UPDATED_BOARD);
@@ -210,9 +208,19 @@ bool Solver::OceanConnectCheck(){
                                 break;
                         }
                         if(!end_search){
-                            UPDATED_BOARD = true;
-                            if(!cell.changeColor(Ocean))
-                                return false;
+                            uint16_t ocean_counter = 0;
+                            for(uint16_t i = 0; i < data.size(); i++){
+                                for(uint16_t j = 0; j < data[i].size(); j++){
+                                    if(data[i][j].color == Ocean)
+                                        ocean_counter++;
+                                }
+                            }
+                            if(ocean_counter > this_ocean_formation.size()){
+                                UPDATED_BOARD = true;
+                                //PROBLEM  - IT SEARCHES FOR DIFFERENT FORMATION - HOW ABOUT THERE IS ONLY 1!!!
+                                if(!cell.changeColor(Ocean))
+                                    return false;
+                            }
                         }
                     }
                 }
@@ -227,32 +235,34 @@ bool Solver::OnlyOneOptionCheck(){
 
     for(auto& node : nodes){
         one_neighbour = nullptr;
-        for(auto const& island: node.second){
-            neighbours = getColorNeighbours(data, island, {Unknown});
-            if(neighbours.size() > 1){
-                one_neighbour = nullptr; //this is set since breaking still goes to the if statement
-                break;
-            }
-            else if(neighbours.size() == 1){
-                if(one_neighbour == nullptr){
-                    one_neighbour = neighbours[0];
-                }
-                else{
-                    one_neighbour = nullptr;
+        if(node.first->num_islands < node.first->max_num_islands){
+            for(auto const& island: node.second){
+                neighbours = getColorNeighbours(data, island, {Unknown});
+                if(neighbours.size() > 1){
+                    one_neighbour = nullptr; //this is set since breaking still goes to the if statement
                     break;
                 }
+                else if(neighbours.size() == 1){
+                    if(one_neighbour == nullptr){
+                        one_neighbour = neighbours[0];
+                    }
+                    else{
+                        one_neighbour = nullptr;
+                        break;
+                    }
+                }
             }
-        }
-        if(one_neighbour){
-            UPDATED_BOARD = true;
-            if(!one_neighbour->changeColor(Island))
-                return false;
-            one_neighbour->owner_node = node.first;
-            node.first->num_islands++;
-            node.second.insert(one_neighbour);
+            if(one_neighbour){
+                UPDATED_BOARD = true;
+                if(!one_neighbour->changeColor(Island))
+                    return false;
+                one_neighbour->owner_node = node.first;
+                node.first->num_islands++;
+                node.second.insert(one_neighbour);
 
-            if(node.first->max_num_islands == node.first->num_islands)
-                finishIsland(data, node.first);
+                if(node.first->max_num_islands == node.first->num_islands)
+                    finishIsland(data, node.first);
+            }
         }
     }
     return true;
@@ -458,12 +468,12 @@ bool Solver::CheckOceanConnect(){
     return connected_oceans.size() == all_oceans.size();
 }
 
-bool Solver::Check4x4OceanNew(){
+bool Solver::Check4x4Ocean(){
     //TODO FIND ITS OWNER!!!
     for(uint16_t row = 0; row < data.size(); row++){
         for(uint16_t column = 0; column < data[row].size(); column++){
 
-            if(data[row][column].color == Unknown &&
+            if(data[row][column].color <= Ocean  &&
                 ((row > 0 && column > 0 && data[row-1][column].color == Ocean &&
                   data[row][column-1].color == Ocean && data[row-1][column-1].color == Ocean)
                  ||
@@ -476,20 +486,103 @@ bool Solver::Check4x4OceanNew(){
                  (row < static_cast<int>(data.size()-1) && column < static_cast<int>(data[row].size()-1)
                   && data[row+1][column].color == Ocean && data[row][column+1].color == Ocean && data[row+1][column+1].color == Ocean))){
 
-                UPDATED_BOARD = true;
-                if(!data[row][column].changeColor(Island))
+                if(!findOwner(&data[row][column])){
                     return false;
+                }
             }
         }
     }
     return true;
 }
+struct fOwnerStruct{
+    Cell* c;
+    std::vector<Cell*> prev;
+    fOwnerStruct(Cell* a, std::vector<Cell*> &p){
+        c = a;
+        prev = p;
+        prev.emplace_back(a);
+    }
+    fOwnerStruct(Cell* a){
+        c = a;
+    }
+};
 
-void Solver::findOwner(){
+bool Solver::findOwner(Cell* cell){
+    std::vector<std::pair<Cell*, std::vector<Cell*>>> paths;
+    for(auto const& node: nodes){
+        if(node.first->max_num_islands > node.first->num_islands && getDistance(node.first, cell) < node.first->max_num_islands){
+            //path can exist!!
+            uint16_t max_changes = node.first->max_num_islands - node.first->num_islands;
+            std::deque<fOwnerStruct> q;
+            std::set<Cell*> been_here;
 
+            q.push_back(fOwnerStruct(node.first));
+            been_here.emplace(node.first);
+            while(!q.empty()){
+                //if we are too far
+                if(q.front().prev.size() > max_changes){
+                    q.pop_front();
+                    continue;
+                }
+                neighbours = getColorNeighbours(data, q.front().c, {Unknown, Island});
+
+                for(auto const& n: neighbours){
+                    //if we find cell
+                    if(n == cell){
+                        paths.emplace_back(std::make_pair(node.first, q.front().prev));
+                        paths.back().second.emplace_back(cell);
+                    }
+                    //if we have not been here yet
+                    else if(been_here.emplace(n).second){
+                        if(n->color == Unknown){
+                            q.push_back(fOwnerStruct(n, q.front().prev));
+                        }
+                        else{
+                            q.push_back(fOwnerStruct(n));
+                        }
+                    }
+                }
+                q.pop_front();
+            }
+        }
+    }
+    //now we analyse all paths - if there are from same node but are multible
+    if(paths.size() == 1){
+        UPDATED_BOARD = true;
+        for(auto const& path_cell: paths.front().second){
+            if(!path_cell->changeColor(Island))
+                return false;
+            path_cell->owner_node = paths.begin()->first;
+            paths.begin()->first->num_islands++;
+            nodes.find(paths.begin()->first)->second.insert(path_cell);
+        }
+        if(paths[0].first->max_num_islands == paths[0].first->num_islands)
+            finishIsland(data, paths[0].first);
+    }
+    else if(!paths.empty()){
+        bool all_good = true;
+        for(uint16_t i = 1; i < paths.size(); i++){
+            if(paths[i].first != paths[0].first)
+                all_good = false;
+
+        }
+        if(all_good){
+            UPDATED_BOARD = true;
+            if(!cell->changeColor(Island))
+                return false;
+            cell->owner_node = paths.begin()->first;
+            paths.begin()->first->num_islands++;
+            nodes.find(paths.begin()->first)->second.insert(cell);
+
+            if(paths[0].first->max_num_islands == paths[0].first->num_islands)
+                finishIsland(data, paths[0].first);
+        }
+    }
+
+    return true;
 }
 
-bool Solver::Check4x4Ocean(){
+bool Solver::Check4x4OceanNew(){
     //TODO FIND ITS OWNER!!!
     for(uint16_t row = 0; row < data.size(); row++){
         for(uint16_t column = 0; column < data[row].size(); column++){
