@@ -119,16 +119,16 @@ int main(){
 
     Solver start_solver(data, nodes);
     start_solver.Init();
-    if(start_solver.CheckEnd()){
-        std::cout<< "END" << std::endl;
-    }
 
     if(!start_solver.SolveTrivial()){
         std::cout << "MISTAKE FOUND!!" << std::endl;
     }
+    if(start_solver.CheckEnd()){
+        std::cout<< "END" << std::endl;
+    }
     checkSolution(start_solver.data, solution_filename);
     //VCASIH ONLYONEOPTIONCHECK NE DELA
-    Solver solution = queue_solver(data, nodes);
+    //Solver solution = queue_solver(data, nodes);    checkSolution(solution.data, solution_filename);
 
 
 /*
@@ -146,7 +146,7 @@ int main(){
     //now the idea is to create recursive random funtion that randomly changes a possible value. THen solve until change
     //if an error happens it returns from recursion - be carefull not refrenece data with reference!!!!!
 
-    checkSolution(solution.data, solution_filename);
+
     auto stop =  std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "That took " << duration.count() << "ms" << std::endl;

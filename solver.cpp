@@ -279,6 +279,7 @@ bool Solver::FillIslandsCheck(){
     //this checks if i know that one direction doesnt have space, need to go to that direction
     std::vector<Cell*> all_unknown_neighbours;
     std::vector<FillIsland> possible_stacks;//first is maximal depth, second is stack
+    print(data);
     int num_unknown_neighbours = 0;
 
     for(auto& n: nodes){
@@ -307,10 +308,9 @@ bool Solver::FillIslandsCheck(){
 
                     num_unknown_neighbours = 0;
                     for(auto const& n2: unknown_neighbours){
-                        if(possible_stacks.back().visited.find(n2) == possible_stacks.back().visited.end()){
+                        if(canIslandBePlaced(n2,n.first) && possible_stacks.back().visited.emplace(n2).second){
                             possible_stacks.back().max_depth++;
                             possible_stacks.back().s.push(n2);
-                            possible_stacks.back().visited.emplace(n2);
                             num_unknown_neighbours++;
                         }
                     }
@@ -323,7 +323,10 @@ bool Solver::FillIslandsCheck(){
             //now we check the potential depth
             int sum_of_less_than = 0;
             Cell* inf = nullptr;
+            std::set<Cell*> unique_possibilities;
             for(uint16_t i = 0; i < possible_stacks.size(); i++){
+                unique_possibilities.insert(possible_stacks[i].visited.begin(), possible_stacks[i].visited.end());
+
                 if(possible_stacks[i].max_depth < required_cells)
                     sum_of_less_than += possible_stacks[i].max_depth;
                 else if(inf){
@@ -354,6 +357,17 @@ bool Solver::FillIslandsCheck(){
                 if(n.first->max_num_islands == n.first->num_islands)
                     finishIsland(data, n.first);
             }
+            /*
+            else if(static_cast<int>(unique_possibilities.size()) <= required_cells){
+                for(auto const& n1: unique_possibilities){
+                    if(!n1->changeColor(Island))
+                        return false;
+                    n1->owner_node = n.first;
+                    n.first->num_islands++;
+                    n.second.insert(n1);
+                }
+            }
+            */
         }
     }
     return true;
@@ -587,6 +601,18 @@ bool Solver::findOwner(Cell* cell){
         }
     }
 
+    return true;
+}
+
+bool Solver::canIslandBePlaced(Cell* cell, Cell* would_be_owner){
+    if(cell->color != Unknown){
+        return false;
+    }
+    neighbours = getColorNeighbours(data, cell, {Node, Island});
+    for(auto const& n: neighbours){
+        if(n->owner_node != would_be_owner)
+            return false;
+    }
     return true;
 }
 
