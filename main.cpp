@@ -102,7 +102,7 @@ Solver stack_solver(std::vector<std::vector<Cell>> &data, std::vector<Cell*> &no
     return out;
 }
 int main(){
-    std::string example = "12";
+    std::string example = "15";
     srand (time(NULL));
 
     const std::string in_filename = "D:/Faks/5/OptimizacijskeMetode/Nurikabe/nurikabe-primer" + example + ".txt";

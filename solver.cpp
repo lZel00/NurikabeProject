@@ -11,26 +11,22 @@ void Solver::Init(){
 }
 
 bool Solver::SolveTrivial(){
-    std::string example = "2";
-
-    const std::string solution_filename = "D:/Faks/5/OptimizacijskeMetode/Nurikabe/nurikabe-resitev" + example + ".txt";
     //MAKE THIS BETTER
     do{
         UPDATED_BOARD = false;
         //productive checks
         if(!BetweenIslandsCheck()) return false;
-        if(!OnlyOneOptionCheck()) return false;
+
+        do{
+            UPDATED_BOARD = false;
+            if(!OnlyOneOptionCheck()) return false;
+        }while(UPDATED_BOARD);
+
         if(!OceanConnectCheck()) return false;
-        std::cout << "BEFORE" << std::endl;
-        checkSolution(data, solution_filename);
         if(!FillIslandsCheck()) return false; //something wrong with this
-        std::cout << "AFTER" << std::endl;
-        checkSolution(data, solution_filename);
         if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
         if(!UnreachablesCheck()) return false;
         if(!Check4x4Ocean()) return false;
-
-
     }while(UPDATED_BOARD);
 
     return true;
@@ -295,9 +291,6 @@ bool Solver::FillIslandsCheck(){
     int num_unknown_neighbours = 0;
 
     for(auto& n: nodes){
-        if(n.first->row == 20 && n.first->column==8 && data[21][8].color == Ocean){
-            int i = 0;
-        }
         all_unknown_neighbours.clear();
         const int required_cells = n.first->max_num_islands - n.first->num_islands;
 
@@ -393,38 +386,50 @@ bool Solver::FillIslandsCheck(){
 //for every node
 bool Solver::TwoOptionsDiagonalCheck(){
     //if 1 more nneded option and a only 2 options are diagonal, we know the diagonal is good
-
     for(auto const& node: nodes){
         if(node.first->max_num_islands - node.first->num_islands == 1){
-
+            bool all_good = false;
             for(auto const& island: node.second){
                 neighbours = getColorNeighbours(data, island, {Unknown});
-                //problem - even if you have access to unknown cell it doent mean its an exit tile
-                if(neighbours.size() == 2){
-                    //the order of neighbours is always from 12 o clock in clockwise
-                    if(neighbours[0]->row+1== island->row && neighbours[1]->column-1 == island->column &&
-                        data[island->row-1][island->column+1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row-1][island->column+1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[0]->column-1 == island->column && neighbours[1]->row-1 == island->row &&
-                             data[island->row+1][island->column+1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row+1][island->column+1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[0]->row-1 == island->row && neighbours[1]->column+1 == island->column &&
-                             data[island->row+1][island->column-1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row+1][island->column-1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[1]->column+1 == island->column && neighbours[0]->row+1 == island->row &&
-                             data[island->row-1][island->column-1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row-1][island->column-1].changeColor(Ocean))
-                            return false;
+                if(neighbours.size() == 2 && !all_good)
+                    all_good = true;
+                else if(all_good && neighbours.size() > 0){
+                    all_good = false;
+                    break;
+                }
+                else if(neighbours.size() > 0)
+                    break;
+            }
+            if(all_good){
+                for(auto const& island: node.second){
+                    //problem - even if you have access to unknown cell it doent mean its an exit tile
+                    if(neighbours.size() == 2){
+                        //the order of neighbours is always from 12 o clock in clockwise
+                        if(neighbours[0]->row+1== island->row && neighbours[1]->column-1 == island->column &&
+                            data[island->row-1][island->column+1].color != Ocean){
+                            UPDATED_BOARD = true;
+                            if(!data[island->row-1][island->column+1].changeColor(Ocean))
+                                return false;
+                        }
+                        else if(neighbours[0]->column-1 == island->column && neighbours[1]->row-1 == island->row &&
+                                 data[island->row+1][island->column+1].color != Ocean){
+                            UPDATED_BOARD = true;
+                            if(!data[island->row+1][island->column+1].changeColor(Ocean))
+                                return false;
+                        }
+                        else if(neighbours[0]->row-1 == island->row && neighbours[1]->column+1 == island->column &&
+                                 data[island->row+1][island->column-1].color != Ocean){
+                            UPDATED_BOARD = true;
+                            if(!data[island->row+1][island->column-1].changeColor(Ocean))
+                                return false;
+                        }
+                        else if(neighbours[1]->column+1 == island->column && neighbours[0]->row+1 == island->row &&
+                                 data[island->row-1][island->column-1].color != Ocean){
+                            UPDATED_BOARD = true;
+                            if(!data[island->row-1][island->column-1].changeColor(Ocean))
+                                return false;
+                        }
+                        break;
                     }
                 }
             }
