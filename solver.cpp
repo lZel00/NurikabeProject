@@ -19,20 +19,17 @@ bool Solver::SolveTrivial(){
         UPDATED_BOARD = false;
         //productive checks
         if(!BetweenIslandsCheck()) return false;
-
         if(!OnlyOneOptionCheck()) return false;
         if(!OceanConnectCheck()) return false;
-        if(!FillIslandsCheck()) return false; //something wrong with this
-
-        if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
-
-        //if(!OneReachCheck()) return false; //something wrong with this
-        if(!UnreachablesCheck()) return false;
         std::cout << "BEFORE" << std::endl;
         checkSolution(data, solution_filename);
-        if(!Check4x4Ocean()) return false;
+        if(!FillIslandsCheck()) return false; //something wrong with this
         std::cout << "AFTER" << std::endl;
         checkSolution(data, solution_filename);
+        if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
+        if(!UnreachablesCheck()) return false;
+        if(!Check4x4Ocean()) return false;
+
 
     }while(UPDATED_BOARD);
 
@@ -298,6 +295,9 @@ bool Solver::FillIslandsCheck(){
     int num_unknown_neighbours = 0;
 
     for(auto& n: nodes){
+        if(n.first->row == 20 && n.first->column==8 && data[21][8].color == Ocean){
+            int i = 0;
+        }
         all_unknown_neighbours.clear();
         const int required_cells = n.first->max_num_islands - n.first->num_islands;
 
@@ -316,8 +316,9 @@ bool Solver::FillIslandsCheck(){
                 possible_stacks.emplace_back(FillIsland());
                 possible_stacks.back().s.push(n1);
                 possible_stacks.back().visited.emplace(n1);
+                //required cells + 1 raziskujem, da ni opcije, da grem prekrijem vse
                 while(!possible_stacks.back().s.empty() &&
-                       possible_stacks.back().max_depth < required_cells) {
+                       possible_stacks.back().max_depth < required_cells+1) {
 
                     std::vector<Cell*> unknown_neighbours = getColorNeighbours(data, possible_stacks.back().s.top(), {Unknown});
 
@@ -333,14 +334,16 @@ bool Solver::FillIslandsCheck(){
                     if(num_unknown_neighbours == 0)
                         possible_stacks.back().s.pop();
                 }
-
             }
             //now we check the potential depth
             int sum_of_less_than = 0;
             Cell* inf = nullptr;
             std::set<Cell*> unique_possibilities;
+            //posebej zanka da res vse unikatne dam skozi - break lahko to unici tu pa tam
             for(uint16_t i = 0; i < possible_stacks.size(); i++){
                 unique_possibilities.insert(possible_stacks[i].visited.begin(), possible_stacks[i].visited.end());
+            }
+            for(uint16_t i = 0; i < possible_stacks.size(); i++){
 
                 if(possible_stacks[i].max_depth < required_cells)
                     sum_of_less_than += possible_stacks[i].max_depth;
@@ -372,6 +375,8 @@ bool Solver::FillIslandsCheck(){
                 if(n.first->max_num_islands == n.first->num_islands)
                     finishIsland(data, n.first);
             }
+            //problem tu ce slucajno imas unique tocno toliko kot required cells - ceprav vec opcij - popolna unija
+            //drugi if ce ima keri se vec opcij
             else if(static_cast<int>(unique_possibilities.size()) <= required_cells){
                 for(auto const& n1: unique_possibilities){
                     if(!n1->changeColor(Island))
