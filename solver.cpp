@@ -96,9 +96,6 @@ bool Solver::UnreachablesCheck(){
     for(uint16_t i = 0; i < data.size(); i++){
         for(uint16_t j = 0; j < data[i].size(); j++){
             if(reachable[i][j] == false && data[i][j].color == Unknown){
-                if(i == 1 && j == 9){
-                    std::cout << "a" << std::endl;
-                }
                 UPDATED_BOARD = true;
                 if(!data[i][j].changeColor(Ocean))
                     return false;
@@ -649,6 +646,10 @@ bool Solver::canIslandBePlaced(Cell* cell, Cell* would_be_owner){
 bool Solver::CheckEnd(){
     if(!Check4x4Ocean())
         return false;
+    for(auto const& node: nodes){
+        if(node.first->num_islands != node.first->max_num_islands)
+            return false;
+    }
     for(uint16_t i = 0; i < data.size();i++){
         for(uint16_t j = 0; j < data[i].size(); j++){
             if(data[i][j].color == Unknown)
