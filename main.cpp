@@ -115,7 +115,7 @@ void runNtimes(std::vector<std::vector<Cell>> &data, std::vector<Cell*> &nodes, 
     std::cout << "Avg time duration: " << duration_ms/N << " miliseconds" << std::endl;
 }
 int main(){
-    std::string example = "15";
+    std::string example = "12";
     srand (time(NULL));
 
     const std::string in_filename = "D:/Faks/5/OptimizacijskeMetode/Nurikabe/nurikabe-primer" + example + ".txt";
@@ -126,8 +126,8 @@ int main(){
     for(auto &a : nodes)
         a->owner_node = a;
 
-    runNtimes(data, nodes);
-    return 0;
+    //runNtimes(data, nodes);
+    //return 0;
 
     print(data);
     auto start = std::chrono::high_resolution_clock::now();
