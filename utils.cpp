@@ -59,14 +59,17 @@ std::vector<Cell*> getAllNodes(std::vector<std::vector<Cell>> &data){
 void print(std::vector<std::vector<Cell>> &data){
     for(uint16_t i = 0; i < data.size();i++){
         for(uint16_t j = 0; j < data[i].size(); j++){
-            if(data[i][j].color == Node)
+            if(data[i][j].color == Node){
                 std::cout << data[i][j].max_num_islands;
+                if(data[i][j].max_num_islands < 10)
+                    std::cout << " ";
+            }
             else if(data[i][j].color == Island)
-                std::cout << ".";
+                std::cout << ". ";
             else if(data[i][j].color == Ocean)
-                std::cout << "#";
+                std::cout << "# ";
             else
-                std::cout << " ";
+                std::cout << "  ";
         }
         std::cout << std::endl;
     }

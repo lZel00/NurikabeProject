@@ -16,14 +16,17 @@ bool Solver::SolveTrivial(){
         UPDATED_BOARD = false;
         //productive checks
         if(!BetweenIslandsCheck()) return false;
-        if(!OnlyOneOptionCheck()) return false;
+
+        do{
+            UPDATED_BOARD = false;
+            if(!OnlyOneOptionCheck()) return false;
+        }while(UPDATED_BOARD);
+
         if(!OceanConnectCheck()) return false;
         if(!FillIslandsCheck()) return false; //something wrong with this
         if(!TwoOptionsDiagonalCheck()) return false; //something wrong with this
-        //if(!OneReachCheck()) return false; //something wrong with this
-        UnreachablesCheck();
+        if(!UnreachablesCheck()) return false;
         if(!Check4x4Ocean()) return false;
-
     }while(UPDATED_BOARD);
 
     return true;
@@ -58,6 +61,7 @@ bool Solver::OnesCheck(){
 
 bool Solver::UnreachablesCheck(){
     //marks nodes as ocean if they are unreahable by any island
+    //TODO - FIX
     std::queue<Cell*> q;
     std::vector<std::vector<bool>> reachable(data.size(),std::vector<bool>(data[0].size()));
 
@@ -71,16 +75,18 @@ bool Solver::UnreachablesCheck(){
                 reachableIt[q.front()->row][q.front()->column] = 0;
                 reachable[q.front()->row][q.front()->column] = true;
                 while(!q.empty()){
-                    if( reachableIt[q.front()->row][q.front()->column] >=node.first->max_num_islands - node.first->num_islands){
+                    if( reachableIt[q.front()->row][q.front()->column] >= node.first->max_num_islands - node.first->num_islands){
                         q.pop();
                         continue;
                     }
 
                     neighbours = getColorNeighbours(data, q.front(), {Unknown,Node, Island});
                     for(auto n : neighbours){
-                        q.push(n);
-                        reachableIt[n->row][n->column] = reachableIt[q.front()->row][q.front()->column]+1;
-                        reachable[n->row][n->column] = true;
+                        if(reachableIt[n->row][n->column] > reachableIt[q.front()->row][q.front()->column]+1){
+                            q.push(n);
+                            reachableIt[n->row][n->column] = reachableIt[q.front()->row][q.front()->column]+1;
+                            reachable[n->row][n->column] = true;
+                        }
                     }
                     q.pop();
                 }
@@ -91,7 +97,8 @@ bool Solver::UnreachablesCheck(){
         for(uint16_t j = 0; j < data[i].size(); j++){
             if(reachable[i][j] == false && data[i][j].color == Unknown){
                 UPDATED_BOARD = true;
-                data[i][j].changeColor(Ocean);
+                if(!data[i][j].changeColor(Ocean))
+                    return false;
             }
         }
     }
@@ -275,7 +282,6 @@ bool Solver::OnlyOneOptionCheck(){
 
 //input nodes
 bool Solver::FillIslandsCheck(){
-    //MAKE IT SO CHECKS IF ISLAND THAT I WOULD PLACE WOULD BE VALID!!!!
     //this checks if i know that one direction doesnt have space, need to go to that direction
     std::vector<Cell*> all_unknown_neighbours;
     std::vector<FillIsland> possible_stacks;//first is maximal depth, second is stack
@@ -300,17 +306,17 @@ bool Solver::FillIslandsCheck(){
                 possible_stacks.emplace_back(FillIsland());
                 possible_stacks.back().s.push(n1);
                 possible_stacks.back().visited.emplace(n1);
+                //required cells + 1 raziskujem, da ni opcije, da grem prekrijem vse
                 while(!possible_stacks.back().s.empty() &&
-                       possible_stacks.back().max_depth < required_cells) {
+                       possible_stacks.back().max_depth < required_cells+1) {
 
                     std::vector<Cell*> unknown_neighbours = getColorNeighbours(data, possible_stacks.back().s.top(), {Unknown});
 
                     num_unknown_neighbours = 0;
                     for(auto const& n2: unknown_neighbours){
-                        if(possible_stacks.back().visited.find(n2) == possible_stacks.back().visited.end()){
+                        if(canIslandBePlaced(n2,n.first) && possible_stacks.back().visited.emplace(n2).second){
                             possible_stacks.back().max_depth++;
                             possible_stacks.back().s.push(n2);
-                            possible_stacks.back().visited.emplace(n2);
                             num_unknown_neighbours++;
                         }
                     }
@@ -318,12 +324,17 @@ bool Solver::FillIslandsCheck(){
                     if(num_unknown_neighbours == 0)
                         possible_stacks.back().s.pop();
                 }
-
             }
             //now we check the potential depth
             int sum_of_less_than = 0;
             Cell* inf = nullptr;
+            std::set<Cell*> unique_possibilities;
+            //posebej zanka da res vse unikatne dam skozi - break lahko to unici tu pa tam
             for(uint16_t i = 0; i < possible_stacks.size(); i++){
+                unique_possibilities.insert(possible_stacks[i].visited.begin(), possible_stacks[i].visited.end());
+            }
+            for(uint16_t i = 0; i < possible_stacks.size(); i++){
+
                 if(possible_stacks[i].max_depth < required_cells)
                     sum_of_less_than += possible_stacks[i].max_depth;
                 else if(inf){
@@ -354,6 +365,17 @@ bool Solver::FillIslandsCheck(){
                 if(n.first->max_num_islands == n.first->num_islands)
                     finishIsland(data, n.first);
             }
+            //problem tu ce slucajno imas unique tocno toliko kot required cells - ceprav vec opcij - popolna unija
+            //drugi if ce ima keri se vec opcij
+            else if(static_cast<int>(unique_possibilities.size()) <= required_cells){
+                for(auto const& n1: unique_possibilities){
+                    if(!n1->changeColor(Island))
+                        return false;
+                    n1->owner_node = n.first;
+                    n.first->num_islands++;
+                    n.second.insert(n1);
+                }
+            }
         }
     }
     return true;
@@ -361,80 +383,51 @@ bool Solver::FillIslandsCheck(){
 //for every node
 bool Solver::TwoOptionsDiagonalCheck(){
     //if 1 more nneded option and a only 2 options are diagonal, we know the diagonal is good
-
     for(auto const& node: nodes){
         if(node.first->max_num_islands - node.first->num_islands == 1){
-
+            bool all_good = false;
             for(auto const& island: node.second){
                 neighbours = getColorNeighbours(data, island, {Unknown});
-                //problem - even if you have access to unknown cell it doent mean its an exit tile
-                if(neighbours.size() == 2){
-                    //the order of neighbours is always from 12 o clock in clockwise
-                    if(neighbours[0]->row+1== island->row && neighbours[1]->column-1 == island->column &&
-                        data[island->row-1][island->column+1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row-1][island->column+1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[0]->column-1 == island->column && neighbours[1]->row-1 == island->row &&
-                             data[island->row+1][island->column+1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row+1][island->column+1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[0]->row-1 == island->row && neighbours[1]->column+1 == island->column &&
-                             data[island->row+1][island->column-1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row+1][island->column-1].changeColor(Ocean))
-                            return false;
-                    }
-                    else if(neighbours[1]->column+1 == island->column && neighbours[0]->row+1 == island->row &&
-                             data[island->row-1][island->column-1].color != Ocean){
-                        UPDATED_BOARD = true;
-                        if(!data[island->row-1][island->column-1].changeColor(Ocean))
-                            return false;
-                    }
+                if(neighbours.size() == 2 && !all_good)
+                    all_good = true;
+                else if(all_good && neighbours.size() > 0){
+                    all_good = false;
+                    break;
                 }
+                else if(neighbours.size() > 0)
+                    break;
             }
-        }
-    }
-    return true;
-}
-//NOT WORKING!
-bool Solver::OneReachCheck(){
-    int cur_dist = 0, needed_dist = 0;
-    std::vector<Cell*> possibilities;
-    for(uint16_t row = 0; row < data.size(); row++){
-        for(uint16_t column = 0; column < data[row].size(); column++){
-            if(data[row][column].color == Unknown){
-                possibilities.clear();
-                for(auto const& node: nodes){
-                    needed_dist = node.first->max_num_islands - node.first->num_islands;
-                    if(needed_dist == 0)
-                        continue;
-
-                    for(auto const& island: node.second){
-                        cur_dist = getDistance(island, &data[row][column]);
-                        if(cur_dist < needed_dist){
-                            possibilities.emplace_back(node.first);
-                            break;
+            if(all_good){
+                for(auto const& island: node.second){
+                    //problem - even if you have access to unknown cell it doent mean its an exit tile
+                    if(neighbours.size() == 2){
+                        //the order of neighbours is always from 12 o clock in clockwise
+                        if(neighbours[0]->row+1== island->row && neighbours[1]->column-1 == island->column &&
+                            data[island->row-1][island->column+1].color != Ocean){
+                            UPDATED_BOARD = true;
+                            if(!data[island->row-1][island->column+1].changeColor(Ocean))
+                                return false;
                         }
-                    }
-                    if(possibilities.size() > 1){
+                        else if(neighbours[0]->column-1 == island->column && neighbours[1]->row-1 == island->row &&
+                                 data[island->row+1][island->column+1].color != Ocean){
+                            UPDATED_BOARD = true;
+                            if(!data[island->row+1][island->column+1].changeColor(Ocean))
+                                return false;
+                        }
+                        else if(neighbours[0]->row-1 == island->row && neighbours[1]->column+1 == island->column &&
+                                 data[island->row+1][island->column-1].color != Ocean){
+                            UPDATED_BOARD = true;
+                            if(!data[island->row+1][island->column-1].changeColor(Ocean))
+                                return false;
+                        }
+                        else if(neighbours[1]->column+1 == island->column && neighbours[0]->row+1 == island->row &&
+                                 data[island->row-1][island->column-1].color != Ocean){
+                            UPDATED_BOARD = true;
+                            if(!data[island->row-1][island->column-1].changeColor(Ocean))
+                                return false;
+                        }
                         break;
                     }
-                }
-                //if after everynode there are no possibilites - wrong!!!
-                if(possibilities.empty())
-                    return false;
-                else if(possibilities.size() == 1){
-                    if(!data[row][column].changeColor(Island))
-                        return false;
-                    data[row][column].owner_node = possibilities.front();
-                    possibilities.front()->num_islands++;
-                    nodes.find(possibilities.front())->second.insert(&data[row][column]);
-                    if(possibilities.front()->max_num_islands == possibilities.front()->num_islands)
-                        finishIsland(data, possibilities.front());
                 }
             }
         }
@@ -475,7 +468,7 @@ bool Solver::CheckOceanConnect(){
 }
 
 bool Solver::Check4x4Ocean(){
-    //TODO FIND ITS OWNER!!!
+    //HERE MISTAKE
     for(uint16_t row = 0; row < data.size(); row++){
         for(uint16_t column = 0; column < data[row].size(); column++){
 
@@ -517,24 +510,31 @@ struct fOwnerStruct{
 
 bool Solver::findOwner(Cell* cell){
     std::vector<std::pair<Cell*, std::vector<Cell*>>> paths;
+
     for(auto const& node: nodes){
         if(node.first->max_num_islands > node.first->num_islands && getDistance(node.first, cell) < node.first->max_num_islands){
             //path can exist!!
             uint16_t max_changes = node.first->max_num_islands - node.first->num_islands;
             std::deque<fOwnerStruct> q;
             std::set<Cell*> been_here;
+            std::set<Cell*> mark_for_destruction;
 
             q.push_back(fOwnerStruct(node.first));
             been_here.emplace(node.first);
             while(!q.empty()){
                 //if we are too far
-                if(q.front().prev.size() > max_changes){
+                if(q.front().prev.size() > max_changes || mark_for_destruction.find(q.front().c) != mark_for_destruction.end()){
                     q.pop_front();
                     continue;
                 }
                 neighbours = getColorNeighbours(data, q.front().c, {Unknown, Island});
 
                 for(auto const& n: neighbours){
+                    //this for is to check if there are multible paths of equal lenght to this cell. If they are this cell is no good
+                    for(auto const& el: q){
+                        if(el.c == n)
+                            mark_for_destruction.emplace(n);
+                    }
                     //if we find cell
                     if(n == cell){
                         paths.emplace_back(std::make_pair(node.first, q.front().prev));
@@ -590,9 +590,25 @@ bool Solver::findOwner(Cell* cell){
     return true;
 }
 
+bool Solver::canIslandBePlaced(Cell* cell, Cell* would_be_owner){
+    if(cell->color != Unknown){
+        return false;
+    }
+    neighbours = getColorNeighbours(data, cell, {Node, Island});
+    for(auto const& n: neighbours){
+        if(n->owner_node != would_be_owner)
+            return false;
+    }
+    return true;
+}
+
 bool Solver::CheckEnd(){
     if(!Check4x4Ocean())
         return false;
+    for(auto const& node: nodes){
+        if(node.first->num_islands != node.first->max_num_islands)
+            return false;
+    }
     for(uint16_t i = 0; i < data.size();i++){
         for(uint16_t j = 0; j < data[i].size(); j++){
             if(data[i][j].color == Unknown)

@@ -63,10 +63,10 @@ private:
     bool OnlyOneOptionCheck();
     bool FillIslandsCheck();
     bool TwoOptionsDiagonalCheck();
-    bool OneReachCheck();
 
-
+    //other utils
     bool findOwner(Cell* cell);
+    bool canIslandBePlaced(Cell* cell, Cell* wouldBeOwner);
 
     //ONLY CHECK
     //ONCE AT END
