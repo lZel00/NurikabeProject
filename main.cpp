@@ -103,8 +103,19 @@ Solver stack_solver(std::vector<std::vector<Cell>> &data, std::vector<Cell*> &no
 
     return out;
 }
+void runNtimes(std::vector<std::vector<Cell>> &data, std::vector<Cell*> &nodes, int N = 20){
+    long duration_ms = 0;
+    for(int i = 0; i < N; i++){
+        auto start = std::chrono::high_resolution_clock::now();
+        //VCASIH ONLYONEOPTIONCHECK NE DELA
+        Solver solution = queue_solver(data, nodes);
+        auto stop =  std::chrono::high_resolution_clock::now();
+        duration_ms += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+    }
+    std::cout << "Avg time duration: " << duration_ms/N << " miliseconds" << std::endl;
+}
 int main(){
-    std::string example = "12";
+    std::string example = "15";
     srand (time(NULL));
 
     const std::string in_filename = "D:/Faks/5/OptimizacijskeMetode/Nurikabe/nurikabe-primer" + example + ".txt";
@@ -115,25 +126,19 @@ int main(){
     for(auto &a : nodes)
         a->owner_node = a;
 
-    auto start = std::chrono::high_resolution_clock::now();
+    runNtimes(data, nodes);
+    return 0;
 
     print(data);
-/*
-    Solver start_solver(data, nodes);
-    start_solver.Init();
-
-    if(!start_solver.SolveTrivial())
-        std::cout << "MISTAKE FOUND!!" << std::endl;
-    if(start_solver.CheckEnd())
-        std::cout<< "END" << std::endl;
-    checkSolution(start_solver.data, solution_filename);
-*/
+    auto start = std::chrono::high_resolution_clock::now();
     //VCASIH ONLYONEOPTIONCHECK NE DELA
-    Solver solution = stack_solver(data, nodes);    checkSolution(solution.data, solution_filename);    print(solution.data);
+    Solver solution = queue_solver(data, nodes);
+    auto stop =  std::chrono::high_resolution_clock::now();
+    //checkSolution(solution.data, solution_filename);
+    print(solution.data);
     //now the idea is to create recursive random funtion that randomly changes a possible value. THen solve until change
     //if an error happens it returns from recursion - be carefull not refrenece data with reference!!!!!
-    auto stop =  std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << "That took " << duration.count() << "ms" << std::endl;
+    std::cout << "Solving took " << duration.count() << "ms" << std::endl;
     return 0;
 }
